@@ -18,6 +18,7 @@ const io = new Server(server, {
   },
 });
 
+// ✅ This will pick up Railway-assigned port or default to 5000 locally
 const PORT = process.env.PORT || 5000;
 
 // Middleware
