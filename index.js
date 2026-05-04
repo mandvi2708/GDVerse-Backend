@@ -16,12 +16,27 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ✅ EXPRESS MIDDLEWARE
-// Allow requests from frontend localhost and production Vercel URL
-app.use(cors({
-  origin: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true
-}));
+// ✅ MANUAL CORS OVERRIDE (The "Nuclear Option")
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  // If the request comes from your Vercel site or localhost, approve it exactly as is
+  if (origin && (origin.includes('vercel.app') || origin.includes('localhost'))) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else {
+    // Fallback to your primary production URL
+    res.header('Access-Control-Allow-Origin', 'https://gd-verse-frontend.vercel.app');
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+
+  // Instantly handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).json({});
+  }
+  next();
+});
 
 app.use(express.json());
 
