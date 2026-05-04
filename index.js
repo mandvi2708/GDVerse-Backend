@@ -50,7 +50,13 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: true,
+    origin: (origin, callback) => {
+      if (!origin || origin.includes('vercel.app') || origin.includes('localhost')) {
+        callback(null, true);
+      } else {
+        callback(null, 'https://gd-verse-frontend.vercel.app');
+      }
+    },
     methods: ['GET', 'POST'],
     credentials: true
   }
