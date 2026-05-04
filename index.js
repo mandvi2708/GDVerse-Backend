@@ -16,20 +16,9 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ✅ EXPRESS MIDDLEWARE
-console.log('--- FULL ENVIRONMENT KEY LIST ---');
-console.log(JSON.stringify(Object.keys(process.env)));
-console.log('---------------------------------------');
-
 // Allow requests from frontend localhost and production Vercel URL
 app.use(cors({
-  origin: function (origin, callback) {
-    // Reflect the exact origin back to the client if it's from Vercel or Localhost
-    if (!origin || origin.includes('vercel.app') || origin.includes('localhost')) {
-      callback(null, origin);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));
@@ -46,13 +35,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: (origin, callback) => {
-      if (!origin || origin.includes('vercel.app') || origin.includes('localhost')) {
-        callback(null, origin);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
+    origin: true,
     methods: ['GET', 'POST'],
     credentials: true
   }
