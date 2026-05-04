@@ -19,15 +19,9 @@ const PORT = process.env.PORT || 5000;
 // Allow requests from frontend localhost and production Vercel URL
 app.use(cors({
   origin: function (origin, callback) {
-    const allowedOrigins = [
-      'http://localhost:5173',
-      'http://localhost:3000',
-      'https://gd-verse-frontend.vercel.app',
-      'https://gd-verse-frontend.vercel.app/'
-    ];
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
+    // Reflect the exact origin back to the client if it's from Vercel or Localhost
+    if (!origin || origin.includes('vercel.app') || origin.includes('localhost')) {
+      callback(null, origin);
     } else {
       callback(new Error('Not allowed by CORS'));
     }
@@ -49,14 +43,8 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: (origin, callback) => {
-      const allowedOrigins = [
-        'http://localhost:5173',
-        'http://localhost:3000',
-        'https://gd-verse-frontend.vercel.app',
-        'https://gd-verse-frontend.vercel.app/'
-      ];
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
+      if (!origin || origin.includes('vercel.app') || origin.includes('localhost')) {
+        callback(null, origin);
       } else {
         callback(new Error('Not allowed by CORS'));
       }
