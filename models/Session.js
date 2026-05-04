@@ -22,6 +22,17 @@ const SessionSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true
+  },
+  transcript: [
+    {
+      sender: String,
+      text: String,
+      timestamp: { type: Date, default: Date.now }
+    }
+  ],
+  minutesOfMeeting: {
+    type: String,
+    default: ""
   }
 }, { timestamps: true });
 
