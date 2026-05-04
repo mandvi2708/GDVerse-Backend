@@ -16,6 +16,10 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ✅ EXPRESS MIDDLEWARE
+console.log('--- Environment Variable Diagnostic ---');
+console.log('Available keys:', Object.keys(process.env).filter(k => !k.includes('PASS') && !k.includes('KEY') && !k.includes('SECRET')));
+console.log('---------------------------------------');
+
 // Allow requests from frontend localhost and production Vercel URL
 app.use(cors({
   origin: function (origin, callback) {
