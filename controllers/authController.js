@@ -5,7 +5,8 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 
 exports.register = async (req, res) => {
-  const { name, email, password } = req.body;
+  let { name, email, password } = req.body;
+  email = email.toLowerCase();
 
   try {
     const existing = await User.findOne({ email });
@@ -26,7 +27,8 @@ exports.register = async (req, res) => {
 };
 
 exports.login = async (req, res) => {
-  const { email, password } = req.body;
+  let { email, password } = req.body;
+  email = email.toLowerCase();
 
   try {
     const user = await User.findOne({ email });
@@ -47,7 +49,8 @@ exports.login = async (req, res) => {
 };
 
 exports.forgotPassword = async (req, res) => {
-  const { email } = req.body;
+  let { email } = req.body;
+  email = email.toLowerCase();
 
   try {
     const user = await User.findOne({ email });
