@@ -94,12 +94,23 @@ io.on('connection', (socket) => {
 });
 
 // ✅ MONGODB CONNECTION
-mongoose.connect(process.env.MONGO_URL, {
+console.log('Attempting to connect to MongoDB...');
+const mongoURI = process.env.MONGO_URL;
+
+if (!mongoURI) {
+  console.error('❌ MONGO_URL is undefined! Please check your Render environment variables.');
+  process.exit(1);
+}
+
+mongoose.connect(mongoURI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
   .then(() => {
     console.log('✅ MongoDB Connected');
-    server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+    server.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server running on port ${PORT}`));
   })
-  .catch(err => console.error('❌ MongoDB Connection Error:', err.message));
+  .catch(err => {
+    console.error('❌ MongoDB Connection Error:', err.message);
+    process.exit(1);
+  });

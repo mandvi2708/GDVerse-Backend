@@ -67,8 +67,10 @@ exports.forgotPassword = async (req, res) => {
         pass: process.env.EMAIL_PASS,
       },
     });
-
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${token}`;
+    
+    // Automatically detect frontend URL from request or environment variable
+    const frontendUrl = process.env.FRONTEND_URL || req.headers.origin || 'http://localhost:5173';
+    const resetUrl = `${frontendUrl}/reset-password/${token}`;
 
     const mailOptions = {
       to: user.email,
