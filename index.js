@@ -19,8 +19,10 @@ const PORT = process.env.PORT || 5000;
 // Allow requests from frontend localhost and production Vercel URL
 app.use(cors({
   origin: [
-    'http://localhost:5173',             // frontend dev
-    'https://gd-verse-frontend.vercel.app' // frontend production
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://gd-verse-frontend.vercel.app',
+    'https://gd-verse-frontend.vercel.app/'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
@@ -41,7 +43,9 @@ const io = new Server(server, {
   cors: {
     origin: [
       'http://localhost:5173',
-      'https://gd-verse-frontend.vercel.app'
+      'http://localhost:3000',
+      'https://gd-verse-frontend.vercel.app',
+      'https://gd-verse-frontend.vercel.app/'
     ],
     methods: ['GET', 'POST'],
     credentials: true
