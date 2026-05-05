@@ -72,10 +72,16 @@ io.on('connection', (socket) => {
     // 1. Tell the new user who is already there
     socket.emit('all-users', usersInRoom);
 
-    // 2. Tell existing users that someone new joined
-    socket.to(normalizedRoomId).emit('user-joined', { userId: socket.id, name });
+    // 2. Tell EVERYONE in the room that someone new joined
+    // We use io.to() to ensure reliability, and filter out self on the frontend if needed
+    // but socket.to() should also work. Let's use a more explicit broadcast.
+    io.to(normalizedRoomId).emit('user-joined', { 
+      userId: socket.id, 
+      name,
+      timestamp: new Date().toISOString()
+    });
     
-    console.log(`User ${name} joined room ${normalizedRoomId}. Current peers:`, usersInRoom.map(u => u.name));
+    console.log(`[Room ${normalizedRoomId}] ${name} (${socket.id}) joined. Peers:`, usersInRoom.length);
   });
 
   socket.on('signal', ({ targetId, signal }) => {
