@@ -49,18 +49,25 @@ const io = new Server(server, {
 io.on('connection', (socket) => {
   console.log('🟢 New user connected:', socket.id);
 
-  socket.on('join-room', (roomId) => {
+  socket.on('join-room', ({ roomId, name }) => {
     socket.join(roomId);
-    console.log(`User ${socket.id} joined room ${roomId}`);
-    socket.to(roomId).emit('user-joined', socket.id);
+    socket.userName = name;
+    console.log(`User ${name} (${socket.id}) joined room ${roomId}`);
+    socket.to(roomId).emit('user-joined', { userId: socket.id, name });
   });
 
   socket.on('signal', ({ targetId, signal }) => {
     io.to(targetId).emit('signal', { senderId: socket.id, signal });
   });
 
-  socket.on('chat-message', (data) => {
-    socket.broadcast.emit('chat-message', data);
+  socket.on('chat-message', ({ roomId, content, senderName }) => {
+    const messageData = { 
+      senderId: socket.id, 
+      senderName: senderName || 'Anonymous', 
+      content,
+      timestamp: new Date()
+    };
+    io.to(roomId).emit('chat-message', messageData);
   });
 
   socket.on('transcript-update', async ({ roomId, sender, text }) => {
