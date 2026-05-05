@@ -1,13 +1,16 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const Session = require("../models/Session");
 
-// 🛡️ Pre-flight Check: Ensure API Key exists
-let API_KEY = process.env.GEMINI_API_KEY;
+// 🛡️ Pre-flight Check: Ensure API Key exists and is valid
+let API_KEY = (process.env.GEMINI_API_KEY || "").trim();
 
-// Auto-fix: Google Keys must start with AIza. Strip any leading 'Y' typo.
-if (API_KEY && API_KEY.startsWith('YAIza')) {
-  console.warn("⚠️ [AI Config] Auto-fixing GEMINI_API_KEY typo (removing leading Y)");
+// Auto-fix: Remove common typo prefix 'Y' or spaces
+if (API_KEY.startsWith('YAIza')) {
   API_KEY = API_KEY.substring(1);
+}
+
+if (!API_KEY) {
+  console.error("❌ CRITICAL: GEMINI_API_KEY is not defined!");
 }
 
 const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
@@ -42,14 +45,22 @@ exports.getBotResponse = async (req, res) => {
     `;
 
     // Try Flash first, then Pro
-    let model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     let result;
-    
     try {
+      console.log("🚀 [AI API] Attempting Flash...");
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        safetySettings: [
+          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+        ]
+      });
       result = await model.generateContent(prompt);
     } catch (e) {
-      console.warn("⚠️ Flash failed, trying Pro...");
-      model = genAI.getGenerativeModel({ model: "gemini-pro" });
+      console.warn("⚠️ Flash failed, trying Pro fallback...");
+      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
       result = await model.generateContent(prompt);
     }
 
