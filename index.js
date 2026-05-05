@@ -50,13 +50,16 @@ io.on('connection', (socket) => {
   console.log('🟢 New user connected:', socket.id);
 
   socket.on('join-room', ({ roomId, name }) => {
-    socket.join(roomId);
+    const normalizedRoomId = roomId?.trim().toLowerCase();
+    if (!normalizedRoomId) return;
+
+    socket.join(normalizedRoomId);
     socket.userName = name;
-    socket.roomId = roomId;
+    socket.roomId = normalizedRoomId;
 
     // Get all other users in the room
     const usersInRoom = [];
-    const clients = io.sockets.adapter.rooms.get(roomId);
+    const clients = io.sockets.adapter.rooms.get(normalizedRoomId);
     if (clients) {
       clients.forEach(clientId => {
         if (clientId !== socket.id) {
@@ -70,9 +73,9 @@ io.on('connection', (socket) => {
     socket.emit('all-users', usersInRoom);
 
     // 2. Tell existing users that someone new joined
-    socket.to(roomId).emit('user-joined', { userId: socket.id, name });
+    socket.to(normalizedRoomId).emit('user-joined', { userId: socket.id, name });
     
-    console.log(`User ${name} joined room ${roomId}. Other users:`, usersInRoom.length);
+    console.log(`User ${name} joined room ${normalizedRoomId}. Current peers:`, usersInRoom.map(u => u.name));
   });
 
   socket.on('signal', ({ targetId, signal }) => {
@@ -80,13 +83,14 @@ io.on('connection', (socket) => {
   });
 
   socket.on('chat-message', ({ roomId, content, senderName }) => {
+    const normalizedRoomId = roomId?.trim().toLowerCase();
     const messageData = { 
       senderId: socket.id, 
       senderName: senderName || 'Anonymous', 
       content,
       timestamp: new Date()
     };
-    io.to(roomId).emit('chat-message', messageData);
+    io.to(normalizedRoomId || roomId).emit('chat-message', messageData);
   });
 
   socket.on('transcript-update', async ({ roomId, sender, text }) => {
