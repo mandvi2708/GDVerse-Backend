@@ -9,11 +9,18 @@ const generateInviteLink = () => {
 // ✅ 1. Create a new GD session
 exports.createSession = async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ message: 'Unauthorized' });
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ message: 'No authorization header provided' });
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    let { date, time, aiCount, humanCount, isImmediate } = req.body;
+    const token = authHeader.split(' ')[1];
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (jwtErr) {
+      return res.status(401).json({ message: 'Invalid or expired token. Please log in again.' });
+    }
+
+    let { date, time, aiCount, humanCount, isImmediate, isInterviewMode, jobDescription } = req.body;
 
     if (isImmediate) {
       const now = new Date();
@@ -25,9 +32,9 @@ exports.createSession = async (req, res) => {
       return res.status(400).json({ message: 'Please select a valid date and time' });
     }
 
-    if (aiCount > 2) {
-      return res.status(400).json({ message: 'Maximum 2 AI participants allowed' });
-    }
+    // Defensive defaults for counts
+    const finalAiCount = isInterviewMode ? 1 : (Number(aiCount) || 0);
+    const finalHumanCount = Number(humanCount) || 2;
 
     const inviteLink = generateInviteLink();
 
@@ -35,16 +42,17 @@ exports.createSession = async (req, res) => {
       creator: decoded.id,
       date,
       time,
-      aiCount: isInterviewMode ? Math.max(aiCount, 1) : Math.min(aiCount, 2),
-      humanCount,
-      isInterviewMode,
-      jobDescription,
+      aiCount: finalAiCount,
+      humanCount: finalHumanCount,
+      isInterviewMode: !!isInterviewMode,
+      jobDescription: jobDescription || "",
       inviteLink,
     });
 
     res.status(201).json(session);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('BACKEND CREATE SESSION ERROR:', err);
+    res.status(500).json({ message: 'Database error while creating session', error: err.message });
   }
 };
 
