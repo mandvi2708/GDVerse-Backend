@@ -51,6 +51,7 @@ exports.generateMOM = async (req, res) => {
     res.status(500).json({ message: "Error generating MOM", error: error.message });
   }
 };
+
 exports.getMOM = async (req, res) => {
   const { sessionId } = req.params;
 
@@ -69,8 +70,6 @@ exports.getBotResponse = async (req, res) => {
   const { transcript, botName, isInterviewMode, jobDescription } = req.body;
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
     const transcriptStr = (transcript || [])
       .map(t => `${t.senderName || t.sender || 'Unknown'}: ${t.content || t.text || ''}`)
       .join('\n');
@@ -93,9 +92,18 @@ exports.getBotResponse = async (req, res) => {
       - End with a question if interviewing.
     `;
 
-    console.log('🤖 [AI Bot] Requesting response with prompt length:', prompt.length);
+    let model;
+    let result;
     
-    const result = await model.generateContent(prompt);
+    try {
+      model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      result = await model.generateContent(prompt);
+    } catch (primaryErr) {
+      console.warn('⚠️ gemini-1.5-flash failed, falling back to gemini-pro:', primaryErr.message);
+      model = genAI.getGenerativeModel({ model: "gemini-pro" });
+      result = await model.generateContent(prompt);
+    }
+
     const responseText = result.response.text();
 
     if (!responseText) {
@@ -107,8 +115,7 @@ exports.getBotResponse = async (req, res) => {
     console.error("❌ AI Bot Error Detail:", error);
     res.status(500).json({ 
       message: "AI service failed", 
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined 
+      error: error.message 
     });
   }
 };
