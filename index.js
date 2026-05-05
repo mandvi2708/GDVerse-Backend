@@ -1,43 +1,14 @@
-// index.js
-
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const dotenv = require('dotenv');
 const mongoose = require('mongoose');
-require('dotenv').config();
 
-const authRoutes = require('./routes/authRoutes');
-const sessionRoutes = require('./routes/sessionRoutes');
-const aiRoutes = require('./routes/aiRoutes'); // 🧠 AI Summary
-const Session = require('./models/Session'); // Required for transcript updates
+dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
-
-// ✅ EXPRESS MIDDLEWARE
-// ✅ GLOBAL CORS OVERRIDE (The "Universal Fix")
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  
-  if (req.method === 'OPTIONS') {
-    return res.status(200).json({});
-  }
-  next();
-});
-
-app.use(express.json());
-
-// ✅ ROUTES
-app.use('/api/auth', authRoutes);
-app.use('/api/sessions', sessionRoutes);
-app.use('/api/ai', aiRoutes); // 🧠 AI Summary
-
-// ✅ CREATE HTTP SERVER
 const server = http.createServer(app);
-
 const io = new Server(server, {
   cors: {
     origin: '*',
@@ -45,49 +16,73 @@ const io = new Server(server, {
   }
 });
 
-// ✅ SOCKET.IO EVENTS
+app.use(cors());
+app.use(express.json());
+
+// Database Connection
+mongoose.connect(process.env.MONGO_URL)
+  .then(() => console.log('✅ Connected to MongoDB Atlas'))
+  .catch(err => console.error('❌ MongoDB Connection Error:', err));
+
+// Models
+const User = require('./models/User');
+const Session = require('./models/Session');
+
+// Routes
+const authRoutes = require('./routes/authRoutes');
+const sessionRoutes = require('./routes/sessionRoutes');
+const aiRoutes = require('./routes/aiRoutes');
+
+app.use('/api/auth', authRoutes);
+app.use('/api/sessions', sessionRoutes);
+app.use('/api/ai', aiRoutes);
+
+// --- New Standardized WebRTC Signaling System ---
+const users = {}; // { socketId: { roomId, userName } }
+
 io.on('connection', (socket) => {
-  console.log('🟢 New user connected:', socket.id);
+  console.log('🟢 New Peer Connection:', socket.id);
 
   socket.on('join-room', ({ roomId, name }) => {
     const normalizedRoomId = roomId?.trim().toLowerCase();
     if (!normalizedRoomId) return;
 
     socket.join(normalizedRoomId);
-    socket.userName = name;
-    socket.roomId = normalizedRoomId;
-
-    // Get all other users in the room
-    const usersInRoom = [];
+    users[socket.id] = { roomId: normalizedRoomId, name };
+    
+    // 1. Get other users in this room
+    const otherUsers = [];
     const clients = io.sockets.adapter.rooms.get(normalizedRoomId);
     if (clients) {
       clients.forEach(clientId => {
         if (clientId !== socket.id) {
-          const clientSocket = io.sockets.sockets.get(clientId);
-          usersInRoom.push({ userId: clientId, name: clientSocket?.userName || 'Anonymous' });
+          otherUsers.push({ userId: clientId, name: users[clientId]?.name || 'Anonymous' });
         }
       });
     }
 
-    // 1. Tell the new user who is already there
-    socket.emit('all-users', usersInRoom);
-
-    // 2. Tell EVERYONE in the room that someone new joined
-    // We use io.to() to ensure reliability, and filter out self on the frontend if needed
-    // but socket.to() should also work. Let's use a more explicit broadcast.
-    io.to(normalizedRoomId).emit('user-joined', { 
-      userId: socket.id, 
-      name,
-      timestamp: new Date().toISOString()
-    });
+    // 2. Tell the newcomer who is already there
+    socket.emit('all-users', otherUsers);
     
-    console.log(`[Room ${normalizedRoomId}] ${name} (${socket.id}) joined. Peers:`, usersInRoom.length);
+    console.log(`[Room ${normalizedRoomId}] ${name} joined. Total peers: ${otherUsers.length + 1}`);
   });
 
-  socket.on('signal', ({ targetId, signal }) => {
-    io.to(targetId).emit('signal', { senderId: socket.id, signal });
+  // Relay Offer (Initiated by newcomer to everyone already in the room)
+  socket.on('sending-signal', ({ userToSignal, signal, callerId }) => {
+    io.to(userToSignal).emit('user-joined', { signal, callerId, name: users[socket.id]?.name });
   });
 
+  // Relay Answer (Sent back by existing users to the newcomer)
+  socket.on('returning-signal', ({ callerId, signal }) => {
+    io.to(callerId).emit('receiving-returned-signal', { signal, id: socket.id });
+  });
+
+  // Relay ICE Candidates
+  socket.on('ice-candidate', ({ targetId, candidate }) => {
+    io.to(targetId).emit('ice-candidate', { candidate, from: socket.id });
+  });
+
+  // Chat Relay
   socket.on('chat-message', ({ roomId, content, senderName }) => {
     const normalizedRoomId = roomId?.trim().toLowerCase();
     const messageData = { 
@@ -96,53 +91,31 @@ io.on('connection', (socket) => {
       content,
       timestamp: new Date()
     };
-    io.to(normalizedRoomId || roomId).emit('chat-message', messageData);
+    io.to(normalizedRoomId).emit('chat-message', messageData);
   });
 
+  // Transcript Relay
   socket.on('transcript-update', async ({ roomId, sender, text }) => {
     try {
       await Session.findOneAndUpdate(
         { inviteLink: roomId },
-        { 
-          $push: { 
-            transcript: { sender, text, timestamp: new Date() } 
-          } 
-        }
+        { $push: { transcript: { sender, text, timestamp: new Date() } } }
       );
-    } catch (err) {
-      console.error('Error updating transcript:', err);
-    }
-  });
-
-  socket.on('disconnecting', () => {
-    [...socket.rooms].forEach(roomId => {
-      socket.to(roomId).emit('user-left', socket.id);
-    });
+    } catch (e) { console.error('Transcript save error:', e); }
   });
 
   socket.on('disconnect', () => {
-    console.log('🔴 User disconnected:', socket.id);
+    const userData = users[socket.id];
+    if (userData) {
+      const { roomId, name } = userData;
+      socket.to(roomId).emit('user-left', socket.id);
+      delete users[socket.id];
+      console.log(`🔴 User ${name} (${socket.id}) disconnected`);
+    }
   });
 });
 
-// ✅ MONGODB CONNECTION
-console.log('Attempting to connect to MongoDB...');
-const mongoURI = process.env.MONGO_URL;
-
-if (!mongoURI) {
-  console.error('❌ MONGO_URL is undefined! Please check your Render environment variables.');
-  process.exit(1);
-}
-
-mongoose.connect(mongoURI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-  .then(() => {
-    console.log('✅ MongoDB Connected');
-    server.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server running on port ${PORT}`));
-  })
-  .catch(err => {
-    console.error('❌ MongoDB Connection Error:', err.message);
-    process.exit(1);
-  });
+const PORT = process.env.PORT || 8080;
+server.listen(PORT, () => {
+  console.log(`🚀 GDVerse Real-time Server running on port ${PORT}`);
+});
