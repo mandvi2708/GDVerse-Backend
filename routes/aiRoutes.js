@@ -2,9 +2,8 @@ const express = require('express');
 const router = express.Router();
 const aiController = require('../controllers/aiController');
 
-router.post('/generate-mom/:sessionId', aiController.generateMOM);
-router.get('/mom/:sessionId', aiController.getMOM);
-router.get('/interview-feedback/:sessionId', aiController.getInterviewFeedback);
-router.post('/bot-response', aiController.getBotResponse);
+router.post('/mom', aiController.generateMOM);
+router.post('/feedback', aiController.getInterviewFeedback);
+router.post('/interview', aiController.getBotResponse);
 
 module.exports = router;

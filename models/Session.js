@@ -48,7 +48,17 @@ const SessionSchema = new mongoose.Schema({
   minutesOfMeeting: {
     type: String,
     default: ""
-  }
+  },
+  userAssessments: [
+    {
+      userName: String,
+      feedback: String,
+      clarityScore: Number,
+      confidenceScore: Number,
+      technicalScore: Number,
+      timestamp: { type: Date, default: Date.now }
+    }
+  ]
 }, { timestamps: true });
 
 module.exports = mongoose.model('Session', SessionSchema);

@@ -40,10 +40,10 @@ exports.getBotResponse = async (req, res) => {
 
       GOAL:
       ${isInterviewMode 
-        ? "Evaluate the last answer briefly and ask the next relevant question. If starting, introduce yourself." 
-        : "Provide a short, insightful point (2 sentences)."}
+        ? "Evaluate the last answer briefly and warmly, then smoothly ask the next relevant question. If starting, introduce yourself enthusiastically." 
+        : "Provide a short, insightful, and highly conversational point (1-2 sentences)."}
       
-      RULES: Plain text only. No emojis. Professional tone. End with a question if interviewing.
+      RULES: Plain text only. No emojis. Tone should be highly conversational, empathetic, and professional. End with a question if interviewing.
     `;
 
     let responseText = "";
@@ -88,7 +88,7 @@ exports.getBotResponse = async (req, res) => {
  * 🚀 ZERO-CRASH MOM Generation
  */
 exports.generateMOM = async (req, res) => {
-  const { sessionId } = req.params;
+  const { sessionId } = req.body;
   console.log(`📝 [MOM Request] inviteLink: ${sessionId}`);
 
   try {
@@ -133,26 +133,65 @@ exports.generateMOM = async (req, res) => {
   }
 };
 
-exports.getMOM = async (req, res) => {
-  try {
-    const session = await Session.findOne({ inviteLink: req.params.sessionId });
-    res.json({ minutesOfMeeting: session?.minutesOfMeeting || "No MOM found." });
-  } catch (e) { res.json({ minutesOfMeeting: "Error fetching MOM." }); }
-};
-
 exports.getInterviewFeedback = async (req, res) => {
-  try {
-    const session = await Session.findOne({ inviteLink: req.params.sessionId });
-    if (!session) return res.json({ feedback: "Session not found." });
+  const { sessionId, userName } = req.body;
+  
+  console.log(`📊 [Feedback Request] Session: ${sessionId}, User: ${userName || 'All'}`);
 
-    const transcriptText = (session.transcript || []).map(t => `${t.sender}: ${t.text}`).join("\n");
-    
-    try {
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-      const result = await model.generateContent(`Analyze this interview and provide a score 1-10 with feedback on Clarity, Confidence, and Correctness:\n${transcriptText}`);
-      return res.json({ feedback: result.response.text() });
-    } catch (e) {
-      return res.json({ feedback: "Evaluation service is temporarily offline." });
+  try {
+    const session = await Session.findOne({ inviteLink: sessionId });
+    if (!session) return res.status(404).json({ message: "Session not found" });
+
+    // Filter data for the specific user
+    const userTranscript = (session.transcript || [])
+      .filter(t => !userName || t.sender === userName)
+      .map(t => t.text)
+      .join("\n");
+
+    const userChat = (session.chatMessages || [])
+      .filter(c => !userName || c.senderName === userName)
+      .map(c => c.content)
+      .join("\n");
+
+    const combinedUserContent = `SPEECH:\n${userTranscript}\n\nCHAT:\n${userChat}`;
+
+    if (!userTranscript && !userChat) {
+      return res.status(400).json({ message: "No data found for this user to evaluate" });
     }
-  } catch (e) { res.json({ feedback: "Error generating feedback." }); }
+
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const prompt = `
+      You are an expert HR and Technical Evaluator. Analyze the following contributions from a participant named "${userName || 'the candidate'}" in a ${session.isInterviewMode ? 'Technical Interview' : 'Group Discussion'}.
+      
+      DATA:
+      ${combinedUserContent}
+
+      GOAL: Provide a detailed professional assessment.
+      FORMAT:
+      1. Overall Score (1-10)
+      2. Key Strengths (Bulleted list)
+      3. Primary Weaknesses (Bulleted list)
+      4. Improvement Suggestions (Actionable advice)
+      5. Category Scores (0-10): Clarity, Confidence, Technical Correctness.
+
+      Tone: Constructive and professional.
+    `;
+
+    const result = await model.generateContent(prompt);
+    const feedbackText = result.response.text();
+
+    // Persist assessment if userName is provided
+    if (userName) {
+      await Session.findOneAndUpdate(
+        { inviteLink: sessionId },
+        { $push: { userAssessments: { userName, feedback: feedbackText } } }
+      );
+    }
+
+    res.json({ feedback: feedbackText });
+  } catch (error) {
+    console.error("🔥 [Feedback Error]:", error.message);
+    res.status(500).json({ error: error.message });
+  }
 };
+
