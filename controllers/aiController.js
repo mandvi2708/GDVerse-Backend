@@ -71,32 +71,45 @@ exports.getBotResponse = async (req, res) => {
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
+    const transcriptStr = (transcript || [])
+      .map(t => `${t.senderName || t.sender || 'Unknown'}: ${t.content || t.text || ''}`)
+      .join('\n');
+
     const prompt = `
       You are a professional HR and Technical Interviewer at a top tech company. 
-      Context: ${isInterviewMode ? `You are interviewing a candidate for the role: ${jobDescription}` : "You are a participant in a group discussion."}
+      Context: ${isInterviewMode ? `You are interviewing a candidate for the role: ${jobDescription || 'Software Engineer'}` : "You are a participant in a group discussion."}
       
       Transcript of the conversation so far:
-      ${(transcript || []).slice(-10).map(t => `${t.senderName || t.sender}: ${t.content || t.text}`).join('\n')}
+      ${transcriptStr}
 
       Your Goal:
       ${isInterviewMode 
-        ? "1. If the candidate just spoke, briefly acknowledge or evaluate their last answer (e.g., 'Good explanation', 'That makes sense'). 2. Then, ask the NEXT relevant technical or HR question to continue the interview. 3. If the transcript is empty, introduce yourself and ask the first question." 
-        : "Contribute a short, insightful, and natural-sounding point to the ongoing group discussion."}
+        ? "1. If the candidate just spoke, briefly acknowledge or evaluate their last answer. 2. Then, ask the NEXT relevant technical or HR question. 3. If the transcript is empty, introduce yourself and ask the first question." 
+        : "Contribute a short, insightful point to the discussion."}
       
       Rules:
-      - Keep your response to 2-4 sentences max.
-      - Be professional yet conversational.
-      - Do not use emojis. 
-      - Always end with a question if in Interview Mode.
+      - Max 3 sentences.
+      - No emojis. 
+      - End with a question if interviewing.
     `;
 
+    console.log('🤖 [AI Bot] Requesting response with prompt length:', prompt.length);
+    
     const result = await model.generateContent(prompt);
-    const response = result.response.text();
+    const responseText = result.response.text();
 
-    res.json({ response });
+    if (!responseText) {
+      throw new Error("Gemini returned an empty response.");
+    }
+
+    res.json({ response: responseText });
   } catch (error) {
-    console.error("AI Bot Error:", error);
-    res.status(500).json({ error: error.message });
+    console.error("❌ AI Bot Error Detail:", error);
+    res.status(500).json({ 
+      message: "AI service failed", 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined 
+    });
   }
 };
 
