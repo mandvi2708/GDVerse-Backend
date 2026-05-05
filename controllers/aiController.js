@@ -66,7 +66,7 @@ exports.getMOM = async (req, res) => {
 };
 
 exports.getBotResponse = async (req, res) => {
-  const { transcript, botName } = req.body;
+  const { transcript, botName, isInterviewMode, jobDescription } = req.body;
 
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -77,10 +77,10 @@ exports.getBotResponse = async (req, res) => {
       ${isInterviewMode ? `The candidate is applying for: ${jobDescription}` : ""}
       
       Here is the transcript of the discussion so far:
-      ${transcript.slice(-10).map(t => `${t.sender}: ${t.content}`).join('\n')}
+      ${(transcript || []).slice(-10).map(t => `${t.senderName || t.sender}: ${t.content || t.text}`).join('\n')}
 
       Based on this context, provide a short, insightful, and natural-sounding contribution. 
-      ${isInterviewMode ? "Ask a relevant technical or HR question based on the conversation or the job description." : "Contribute to the group discussion."}
+      ${isInterviewMode ? "If the transcript is empty or just started, introduce yourself and ask the first question. Otherwise, ask a relevant technical or HR question based on the candidate's last response." : "Contribute naturally to the ongoing group discussion."}
       Keep it to 2-3 sentences max. Do not use emojis. 
     `;
 
