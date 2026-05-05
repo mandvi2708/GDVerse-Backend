@@ -9,15 +9,17 @@ const generateInviteLink = () => {
 // ✅ 1. Create a new GD session
 exports.createSession = async (req, res) => {
   try {
-    console.log('🔁 Incoming session creation request...');
-
     const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ message: 'Unauthorized - Token missing' });
+    if (!token) return res.status(401).json({ message: 'Unauthorized' });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('✅ Token decoded:', decoded);
+    let { date, time, aiCount, humanCount, isImmediate } = req.body;
 
-    const { date, time, aiCount, humanCount } = req.body;
+    if (isImmediate) {
+      const now = new Date();
+      date = now.toISOString().split('T')[0]; // YYYY-MM-DD
+      time = now.toTimeString().split(' ')[0].substring(0, 5); // HH:MM
+    }
 
     if (!date || !time || aiCount === undefined || humanCount === undefined) {
       return res.status(400).json({ message: 'All fields are required' });
@@ -34,10 +36,8 @@ exports.createSession = async (req, res) => {
       inviteLink,
     });
 
-    console.log('✅ Session created:', session);
     res.status(201).json(session);
   } catch (err) {
-    console.error('❌ Error creating session:', err.message);
     res.status(500).json({ error: err.message });
   }
 };
