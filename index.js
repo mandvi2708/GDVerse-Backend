@@ -83,7 +83,7 @@ io.on('connection', (socket) => {
   });
 
   // Chat Relay
-  socket.on('chat-message', ({ roomId, content, senderName }) => {
+  socket.on('chat-message', async ({ roomId, content, senderName }) => {
     const normalizedRoomId = roomId?.trim().toLowerCase();
     const messageData = { 
       senderId: socket.id, 
@@ -92,6 +92,14 @@ io.on('connection', (socket) => {
       timestamp: new Date()
     };
     io.to(normalizedRoomId).emit('chat-message', messageData);
+
+    // Persist to DB for MOM
+    try {
+      await Session.findOneAndUpdate(
+        { inviteLink: normalizedRoomId },
+        { $push: { chatMessages: { senderName: messageData.senderName, content: messageData.content } } }
+      );
+    } catch (e) { console.error('Chat save error:', e); }
   });
 
   // Transcript Relay

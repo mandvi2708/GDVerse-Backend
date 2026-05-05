@@ -30,6 +30,13 @@ const SessionSchema = new mongoose.Schema({
       timestamp: { type: Date, default: Date.now }
     }
   ],
+  chatMessages: [
+    {
+      senderName: String,
+      content: String,
+      timestamp: { type: Date, default: Date.now }
+    }
+  ],
   isInterviewMode: {
     type: Boolean,
     default: false

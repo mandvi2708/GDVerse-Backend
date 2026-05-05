@@ -11,14 +11,12 @@ const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
 /**
  * 🚀 ZERO-CRASH AI Bot Response Controller
- * Designed to never return 500. Always returns a response or a safe fallback.
  */
 exports.getBotResponse = async (req, res) => {
   const reqId = Math.random().toString(36).substring(7);
   console.log(`[${reqId}] 📨 AI Bot Request Received`);
 
   try {
-    // 1. Pre-checks
     if (!genAI) {
       console.error(`[${reqId}] ❌ Configuration Error: genAI not initialized`);
       return res.status(200).json({ 
@@ -29,15 +27,11 @@ exports.getBotResponse = async (req, res) => {
 
     const { transcript, isInterviewMode, jobDescription } = req.body;
     
-    // 2. Data Preparation
     const history = (transcript || []).slice(-10);
     const transcriptStr = history
       .map(t => `${t.senderName || t.sender || 'Participant'}: ${t.content || t.text || ''}`)
       .join('\n');
 
-    console.log(`[${reqId}] 📝 Transcript lines: ${history.length}`);
-
-    // 3. Prompt Construction
     const prompt = `
       You are a professional AI Assistant in a live video meeting.
       ROLE: ${isInterviewMode ? `Technical Recruiter for: ${jobDescription || 'Software Engineer'}` : "Discussion Participant"}
@@ -52,7 +46,6 @@ exports.getBotResponse = async (req, res) => {
       RULES: Plain text only. No emojis. Professional tone. End with a question if interviewing.
     `;
 
-    // 4. Gemini Call with Multi-Model Fallback and Safety Bypass
     let responseText = "";
     const modelsToTry = ["gemini-pro", "gemini-1.5-flash"];
 
@@ -71,19 +64,13 @@ exports.getBotResponse = async (req, res) => {
 
         const result = await model.generateContent(prompt);
         responseText = result.response.text();
-        
-        if (responseText) {
-          console.log(`[${reqId}] ✅ Success with ${modelName}`);
-          break; 
-        }
+        if (responseText) break; 
       } catch (err) {
         console.error(`[${reqId}] ⚠️ ${modelName} failed:`, err.message);
       }
     }
 
-    // 5. Final Fallback if all models fail
     if (!responseText) {
-      console.warn(`[${reqId}] ⚠️ All AI models failed. Using static fallback.`);
       responseText = isInterviewMode 
         ? "That's an interesting perspective. Could you tell me more about your experience in this area?" 
         : "I agree with the direction this is going. What are your thoughts on the implementation details?";
@@ -93,10 +80,7 @@ exports.getBotResponse = async (req, res) => {
 
   } catch (globalErr) {
     console.error(`[${reqId}] 🔥 Global Crash Caught:`, globalErr.stack);
-    return res.status(200).json({ 
-      response: "I'm experiencing a slight technical glitch, but I'm still listening! Please continue.",
-      error: globalErr.message 
-    });
+    return res.status(200).json({ response: "Technical glitch, please continue!" });
   }
 };
 
@@ -105,34 +89,47 @@ exports.getBotResponse = async (req, res) => {
  */
 exports.generateMOM = async (req, res) => {
   const { sessionId } = req.params;
-  console.log(`📝 [MOM] Request for ${sessionId}`);
+  console.log(`📝 [MOM Request] inviteLink: ${sessionId}`);
 
   try {
     const session = await Session.findOne({ inviteLink: sessionId });
-    if (!session) return res.status(200).json({ message: "Session not found", minutesOfMeeting: "Session data unavailable." });
+    if (!session) return res.status(404).json({ message: "Session not found" });
 
     const transcriptText = (session.transcript || [])
-      .map(t => `${t.sender}: ${t.text}`)
+      .map(t => `[Speech] ${t.sender}: ${t.text}`)
       .join("\n");
 
-    if (!transcriptText) {
-      return res.status(200).json({ message: "No transcript recorded", minutesOfMeeting: "No conversation was recorded to summarize." });
+    const chatText = (session.chatMessages || [])
+      .map(c => `[Chat] ${c.senderName}: ${c.content}`)
+      .join("\n");
+
+    const combinedHistory = `TRANSCRIPT:\n${transcriptText}\n\nCHAT LOG:\n${chatText}`;
+
+    if (!transcriptText && !chatText) {
+      return res.status(400).json({ message: "No data found to summarize" });
     }
 
-    try {
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-      const result = await model.generateContent(`Generate a professional MOM for this transcript:\n${transcriptText}`);
-      const mom = result.response.text();
-      session.minutesOfMeeting = mom;
-      await session.save();
-      return res.json({ message: "Success", minutesOfMeeting: mom });
-    } catch (aiErr) {
-      console.error("MOM AI Error:", aiErr.message);
-      return res.json({ message: "AI Error", minutesOfMeeting: "Summary generation is currently unavailable, but your transcript is saved." });
-    }
-  } catch (err) {
-    console.error("MOM Global Error:", err.message);
-    res.json({ message: "Error", minutesOfMeeting: "A technical error occurred during summary generation." });
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const prompt = `
+      You are an expert executive secretary. Based on the following meeting data (speech transcript and chat logs), generate professional Minutes of Meeting (MOM).
+      Include: Executive Summary, Key Discussion Points, Decisions Made, and Action Items.
+      
+      DATA:
+      ${combinedHistory}
+
+      Tone: Professional, concise, and structured. Use Markdown.
+    `;
+
+    const result = await model.generateContent(prompt);
+    const mom = result.response.text();
+
+    session.minutesOfMeeting = mom;
+    await session.save();
+
+    res.json({ message: "MOM generated", minutesOfMeeting: mom });
+  } catch (error) {
+    console.error("🔥 [MOM Error]:", error.message);
+    res.status(500).json({ message: "MOM generation failed", error: error.message });
   }
 };
 
@@ -152,10 +149,10 @@ exports.getInterviewFeedback = async (req, res) => {
     
     try {
       const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-      const result = await model.generateContent(`Evaluate this interview transcript and provide a score 1-10:\n${transcriptText}`);
+      const result = await model.generateContent(`Analyze this interview and provide a score 1-10 with feedback on Clarity, Confidence, and Correctness:\n${transcriptText}`);
       return res.json({ feedback: result.response.text() });
     } catch (e) {
-      return res.json({ feedback: "Evaluation service is temporarily offline. Please download the transcript for manual review." });
+      return res.json({ feedback: "Evaluation service is temporarily offline." });
     }
   } catch (e) { res.json({ feedback: "Error generating feedback." }); }
 };
