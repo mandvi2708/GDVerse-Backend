@@ -3,115 +3,60 @@ const Session = require("../models/Session");
 
 // 🛡️ Pre-flight Check: Ensure API Key exists
 const API_KEY = process.env.GEMINI_API_KEY;
-if (!API_KEY) {
-  console.error("❌ CRITICAL: GEMINI_API_KEY is not defined in environment variables!");
-}
-
-// Initialize Gemini API safely
 const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
 /**
  * AI Bot Response Controller
- * Handles real-time conversation and interview logic
  */
 exports.getBotResponse = async (req, res) => {
-  // 1. Initial Logging
-  console.log("📨 [AI Request] Received at /api/ai/bot-response");
+  console.log("📨 [AI Request] Received:", JSON.stringify(req.body).substring(0, 200) + "...");
   
   try {
-    // 2. Validate API Key
-    if (!genAI) {
-      console.error("❌ [AI Error] Gemini API Key is missing");
-      return res.status(500).json({ 
-        message: "AI Configuration Error", 
-        error: "API Key not found on server" 
-      });
-    }
+    if (!genAI) throw new Error("GEMINI_API_KEY is missing or invalid");
 
-    // 3. Validate Input
     const { transcript, botName, isInterviewMode, jobDescription } = req.body;
     
-    if (!transcript || !Array.isArray(transcript)) {
-      console.warn("⚠️ [AI Warning] Missing or invalid transcript in request");
-      return res.status(400).json({ message: "Invalid request: Transcript is required" });
-    }
-
-    console.log(`🤖 [AI Context] Mode: ${isInterviewMode ? 'Interview' : 'GD'}, Job: ${jobDescription || 'N/A'}`);
-
-    // 4. Construct Structured Prompt
-    const transcriptStr = transcript
+    // Construct Prompt
+    const transcriptStr = (transcript || [])
       .map(t => `${t.senderName || t.sender || 'Participant'}: ${t.content || t.text || ''}`)
       .join('\n');
 
     const prompt = `
-      You are a professional AI Assistant participating in a live video conference.
-      
-      ROLE: ${isInterviewMode ? `Professional Technical Recruiter interviewing for: ${jobDescription || 'Software Engineer'}` : "Expert Discussion Participant"}
-      
-      TRANSCRIPT OF CONVERSATION:
-      ${transcriptStr || "[Conversation just started]"}
+      You are a professional AI Assistant in a live video meeting.
+      ROLE: ${isInterviewMode ? `Technical Recruiter for: ${jobDescription || 'Software Engineer'}` : "Discussion Participant"}
+      TRANSCRIPT:
+      ${transcriptStr || "[Start of conversation]"}
 
       GOAL:
       ${isInterviewMode 
-        ? "Evaluate the candidate's last answer briefly (if any) and ask the next relevant technical or HR question. If no messages exist, introduce yourself and ask the first question." 
-        : "Provide a short, insightful, and natural-sounding contribution to the discussion."}
-      
-      CONSTRAINTS:
-      - Response length: 2-3 sentences.
-      - Tone: Professional, clear, and encouraging.
-      - Format: Plain text only. NO EMOJIS. NO MARKDOWN.
-      - Always end with a question if in Interview Mode.
+        ? "Evaluate the last answer and ask the next relevant question. If starting, introduce yourself." 
+        : "Provide a short, insightful point (2 sentences)."}
+      RULES: No emojis. Professional tone. End with a question if interviewing.
     `;
 
-    // 5. Execute Gemini Call with Fallback Model Support
-    let model;
+    // Try Flash first, then Pro
+    let model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     let result;
     
     try {
-      console.log("🚀 [AI API] Calling Gemini-1.5-Flash...");
-      model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      
-      // Use the structured format requested by the user for internal SDK processing
-      result = await model.generateContent({
-        contents: [{ role: "user", parts: [{ text: prompt }] }]
-      });
-    } catch (primaryErr) {
-      console.error("⚠️ [AI API] Gemini-1.5-Flash failed:", primaryErr.message);
-      
-      console.log("🔄 [AI API] Falling back to Gemini-Pro...");
+      result = await model.generateContent(prompt);
+    } catch (e) {
+      console.warn("⚠️ Flash failed, trying Pro...");
       model = genAI.getGenerativeModel({ model: "gemini-pro" });
       result = await model.generateContent(prompt);
     }
 
-    // 6. Safe Response Parsing
-    if (!result || !result.response) {
-      throw new Error("Gemini API returned an empty or invalid response object");
-    }
-
     const responseText = result.response.text();
-    
-    if (!responseText || responseText.trim() === "") {
-      console.warn("⚠️ [AI API] Gemini returned empty text");
-      return res.status(200).json({ 
-        response: isInterviewMode ? "Could you please elaborate on that?" : "I agree with that point. What do others think?" 
-      });
-    }
+    console.log("✅ [AI Success] Reply:", responseText.substring(0, 50) + "...");
 
-    console.log("✅ [AI Success] Generated response length:", responseText.length);
-
-    // 7. Final Clean Response
-    return res.status(200).json({
-      response: responseText.trim()
-    });
+    return res.status(200).json({ response: responseText.trim() });
 
   } catch (error) {
-    // 8. Comprehensive Error Logging
-    console.error("🔥 [AI CRITICAL ERROR]:", error.stack);
-    
+    console.error("🔥 [AI ERROR]:", error.message);
     return res.status(500).json({ 
-      message: "Internal AI Processing Error", 
+      message: "AI service error", 
       error: error.message,
-      reply: "I'm having a bit of trouble connecting right now. Please continue, and I'll jump back in shortly."
+      reply: "I'm having trouble connecting. Please continue!" 
     });
   }
 };
@@ -121,12 +66,15 @@ exports.getBotResponse = async (req, res) => {
  */
 exports.generateMOM = async (req, res) => {
   const { sessionId } = req.params;
-  console.log(`📝 [MOM Request] Session: ${sessionId}`);
+  console.log(`📝 [MOM Request] inviteLink: ${sessionId}`);
 
   try {
-    const session = await Session.findById(sessionId);
-    if (!session || !session.transcript || session.transcript.length === 0) {
-      return res.status(400).json({ message: "No transcript found for summary" });
+    // FIX: Using findOne with inviteLink instead of findById
+    const session = await Session.findOne({ inviteLink: sessionId });
+    if (!session) return res.status(404).json({ message: "Session not found" });
+
+    if (!session.transcript || session.transcript.length === 0) {
+      return res.status(400).json({ message: "No transcript recorded for this session" });
     }
 
     const transcriptText = session.transcript
@@ -144,13 +92,13 @@ exports.generateMOM = async (req, res) => {
 
     res.json({ message: "MOM generated", minutesOfMeeting: mom });
   } catch (error) {
-    console.error("🔥 [MOM Error]:", error);
+    console.error("🔥 [MOM Error]:", error.message);
     res.status(500).json({ message: "MOM generation failed", error: error.message });
   }
 };
 
 /**
- * Get MOM for a session
+ * Get MOM
  */
 exports.getMOM = async (req, res) => {
   try {
@@ -163,27 +111,25 @@ exports.getMOM = async (req, res) => {
 };
 
 /**
- * Get Interview Evaluation Feedback
+ * Get Interview Feedback
  */
 exports.getInterviewFeedback = async (req, res) => {
   const { sessionId } = req.params;
-  console.log(`📊 [Feedback Request] Session: ${sessionId}`);
-
   try {
     const session = await Session.findOne({ inviteLink: sessionId });
     if (!session) return res.status(404).json({ message: "Session not found" });
 
-    const transcriptText = session.transcript
+    const transcriptText = (session.transcript || [])
       .map(t => `${t.sender}: ${t.text}`)
       .join("\n");
 
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const prompt = `Analyze this interview for a ${session.jobDescription || 'Candidate'}. Provide scores (0-10) and feedback for Clarity, Confidence, and Technical Correctness.\n\nTranscript:\n${transcriptText}`;
+    const prompt = `Evaluate this interview for ${session.jobDescription || 'Candidate'}. Provide scores (0-10) for Clarity, Confidence, and Correctness. \n\nTranscript:\n${transcriptText}`;
 
     const result = await model.generateContent(prompt);
     res.json({ feedback: result.response.text() });
   } catch (error) {
-    console.error("🔥 [Feedback Error]:", error);
+    console.error("🔥 [Feedback Error]:", error.message);
     res.status(500).json({ error: error.message });
   }
 };
