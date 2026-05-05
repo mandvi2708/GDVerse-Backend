@@ -17,12 +17,16 @@ exports.createSession = async (req, res) => {
 
     if (isImmediate) {
       const now = new Date();
-      date = now.toISOString().split('T')[0]; // YYYY-MM-DD
-      time = now.toTimeString().split(' ')[0].substring(0, 5); // HH:MM
+      date = now.toISOString().split('T')[0];
+      time = now.toTimeString().split(' ')[0].substring(0, 5);
     }
 
-    if (!date || !time || aiCount === undefined || humanCount === undefined) {
-      return res.status(400).json({ message: 'All fields are required' });
+    if (!date || !time) {
+      return res.status(400).json({ message: 'Please select a valid date and time' });
+    }
+
+    if (aiCount > 2) {
+      return res.status(400).json({ message: 'Maximum 2 AI participants allowed' });
     }
 
     const inviteLink = generateInviteLink();
@@ -31,7 +35,7 @@ exports.createSession = async (req, res) => {
       creator: decoded.id,
       date,
       time,
-      aiCount,
+      aiCount: Math.min(aiCount, 2),
       humanCount,
       inviteLink,
     });
