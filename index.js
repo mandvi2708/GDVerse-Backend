@@ -52,8 +52,27 @@ io.on('connection', (socket) => {
   socket.on('join-room', ({ roomId, name }) => {
     socket.join(roomId);
     socket.userName = name;
-    console.log(`User ${name} (${socket.id}) joined room ${roomId}`);
+    socket.roomId = roomId;
+
+    // Get all other users in the room
+    const usersInRoom = [];
+    const clients = io.sockets.adapter.rooms.get(roomId);
+    if (clients) {
+      clients.forEach(clientId => {
+        if (clientId !== socket.id) {
+          const clientSocket = io.sockets.sockets.get(clientId);
+          usersInRoom.push({ userId: clientId, name: clientSocket?.userName || 'Anonymous' });
+        }
+      });
+    }
+
+    // 1. Tell the new user who is already there
+    socket.emit('all-users', usersInRoom);
+
+    // 2. Tell existing users that someone new joined
     socket.to(roomId).emit('user-joined', { userId: socket.id, name });
+    
+    console.log(`User ${name} joined room ${roomId}. Other users:`, usersInRoom.length);
   });
 
   socket.on('signal', ({ targetId, signal }) => {
@@ -85,9 +104,14 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('disconnecting', () => {
+    [...socket.rooms].forEach(roomId => {
+      socket.to(roomId).emit('user-left', socket.id);
+    });
+  });
+
   socket.on('disconnect', () => {
     console.log('🔴 User disconnected:', socket.id);
-    io.emit('user-left', socket.id);
   });
 });
 
