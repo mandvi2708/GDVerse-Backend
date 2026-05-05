@@ -72,13 +72,16 @@ exports.getBotResponse = async (req, res) => {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `
-      You are participating in a group discussion as ${botName}, an AI assistant.
+      You are participating in a conversation. 
+      Context: ${isInterviewMode ? "You are a professional HR and Technical Interviewer." : "You are a participant in a group discussion."}
+      ${isInterviewMode ? `The candidate is applying for: ${jobDescription}` : ""}
+      
       Here is the transcript of the discussion so far:
       ${transcript.slice(-10).map(t => `${t.sender}: ${t.content}`).join('\n')}
 
-      Based on this context, provide a short, insightful, and natural-sounding contribution to the discussion. 
+      Based on this context, provide a short, insightful, and natural-sounding contribution. 
+      ${isInterviewMode ? "Ask a relevant technical or HR question based on the conversation or the job description." : "Contribute to the group discussion."}
       Keep it to 2-3 sentences max. Do not use emojis. 
-      Speak as if you are part of the conversation.
     `;
 
     const result = await model.generateContent(prompt);
@@ -87,6 +90,44 @@ exports.getBotResponse = async (req, res) => {
     res.json({ response });
   } catch (error) {
     console.error("AI Bot Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getInterviewFeedback = async (req, res) => {
+  const { sessionId } = req.params;
+
+  try {
+    const session = await Session.findOne({ inviteLink: sessionId });
+    if (!session) return res.status(404).json({ message: "Session not found" });
+
+    const transcriptText = session.transcript
+      .map((entry) => `${entry.sender}: ${entry.text}`)
+      .join("\n");
+
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const prompt = `
+      As an expert HR and Technical Evaluator, analyze the following interview transcript.
+      Job Role: ${session.jobDescription || "General Candidate"}
+      
+      Evaluate the candidate on:
+      1. Clarity of Thought
+      2. Confidence Level
+      3. Technical/HR Correctness
+      
+      Provide a detailed feedback report with a score (out of 10) for each category and an overall recommendation.
+      
+      Transcript:
+      ${transcriptText}
+    `;
+
+    const result = await model.generateContent(prompt);
+    const feedback = result.response.text();
+
+    res.json({ feedback });
+  } catch (error) {
+    console.error("Interview Feedback Error:", error);
     res.status(500).json({ error: error.message });
   }
 };
