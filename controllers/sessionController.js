@@ -76,11 +76,24 @@ exports.deleteSession = async (req, res) => {
 exports.getSessionByInviteLink = async (req, res) => {
   try {
     const { inviteLink } = req.params;
-    const session = await Session.findOne({ inviteLink });
+    const session = await Session.findOne({ inviteLink }).populate('creator', 'name');
 
     if (!session) return res.status(404).json({ message: 'Session not found' });
 
     res.status(200).json(session);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ 5. Get ALL sessions (for the global dashboard)
+exports.getAllSessions = async (req, res) => {
+  try {
+    const sessions = await Session.find()
+      .populate('creator', 'name')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(sessions);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -4,11 +4,13 @@ const {
   createSession,
   getUserSessions,
   deleteSession,
-  getSessionByInviteLink
+  getSessionByInviteLink,
+  getAllSessions
 } = require('../controllers/sessionController');
 
 router.post('/create', createSession);
 router.get('/my-sessions', getUserSessions);
+router.get('/all', getAllSessions);
 router.get('/join/:inviteLink', getSessionByInviteLink); // ✅ optional, for GD room
 router.delete('/delete/:id', deleteSession);
 
