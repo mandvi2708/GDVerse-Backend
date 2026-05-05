@@ -30,6 +30,14 @@ const SessionSchema = new mongoose.Schema({
       timestamp: { type: Date, default: Date.now }
     }
   ],
+  isInterviewMode: {
+    type: Boolean,
+    default: false
+  },
+  jobDescription: {
+    type: String,
+    default: ""
+  },
   minutesOfMeeting: {
     type: String,
     default: ""

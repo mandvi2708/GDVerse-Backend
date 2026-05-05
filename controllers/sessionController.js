@@ -35,8 +35,10 @@ exports.createSession = async (req, res) => {
       creator: decoded.id,
       date,
       time,
-      aiCount: Math.min(aiCount, 2),
+      aiCount: isInterviewMode ? Math.max(aiCount, 1) : Math.min(aiCount, 2),
       humanCount,
+      isInterviewMode,
+      jobDescription,
       inviteLink,
     });
 
