@@ -115,6 +115,15 @@ io.on('connection', (socket) => {
   });
 });
 
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error("🔥 [GLOBAL ERROR]:", err.stack);
+  res.status(500).json({ 
+    message: "Something went wrong on the server!", 
+    error: err.message 
+  });
+});
+
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
   console.log(`🚀 GDVerse Real-time Server running on port ${PORT}`);

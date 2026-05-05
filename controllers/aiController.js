@@ -9,6 +9,9 @@ if (API_KEY.startsWith('YAIza')) {
   API_KEY = API_KEY.substring(1);
 }
 
+// Log masked key for verification
+console.log(`🔑 [AI Config] Key starts with: ${API_KEY ? API_KEY.substring(0, 8) + "..." : "MISSING!"}`);
+
 if (!API_KEY) {
   console.error("❌ CRITICAL: GEMINI_API_KEY is not defined!");
 }
@@ -44,12 +47,12 @@ exports.getBotResponse = async (req, res) => {
       RULES: No emojis. Professional tone. End with a question if interviewing.
     `;
 
-    // Try Flash first, then Pro
+    // Try Pro as primary for maximum compatibility, then fallback to Flash
     let result;
     try {
-      console.log("🚀 [AI API] Attempting Flash...");
+      console.log("🚀 [AI API] Attempting Gemini-Pro...");
       const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
+        model: "gemini-pro",
         safetySettings: [
           { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
           { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -59,8 +62,8 @@ exports.getBotResponse = async (req, res) => {
       });
       result = await model.generateContent(prompt);
     } catch (e) {
-      console.warn("⚠️ Flash failed, trying Pro fallback...");
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+      console.warn("⚠️ Gemini-Pro failed, trying Flash fallback...");
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       result = await model.generateContent(prompt);
     }
 
