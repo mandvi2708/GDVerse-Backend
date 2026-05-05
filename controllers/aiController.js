@@ -2,7 +2,14 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const Session = require("../models/Session");
 
 // 🛡️ Pre-flight Check: Ensure API Key exists
-const API_KEY = process.env.GEMINI_API_KEY;
+let API_KEY = process.env.GEMINI_API_KEY;
+
+// Auto-fix: Google Keys must start with AIza. Strip any leading 'Y' typo.
+if (API_KEY && API_KEY.startsWith('YAIza')) {
+  console.warn("⚠️ [AI Config] Auto-fixing GEMINI_API_KEY typo (removing leading Y)");
+  API_KEY = API_KEY.substring(1);
+}
+
 const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
 /**
