@@ -27,7 +27,7 @@ exports.getBotResponse = async (req, res) => {
 
     const { transcript, isInterviewMode, jobDescription } = req.body;
     
-    const history = (transcript || []).slice(-10);
+    const history = (transcript || []).slice(-50);
     const transcriptStr = history
       .map(t => `${t.senderName || t.sender || 'Participant'}: ${t.content || t.text || ''}`)
       .join('\n');
@@ -40,36 +40,22 @@ exports.getBotResponse = async (req, res) => {
 
       GOAL:
       ${isInterviewMode 
-        ? `Your behavior:
-- Make the AI interviewer sound human and conversational.
-- Ask one interview question at a time.
-- Wait for candidate response.
-- Evaluate the response gracefully and ask intelligent, context-aware follow-up questions.
-- Keep the interview progression dynamic and natural.
+        ? `You are conducting a formal but conversational mock interview. 
+Follow this strict flow based on the Transcript:
+1. First, carefully analyze the transcript and count EXACTLY how many distinct interview questions you (the AI) have asked the candidate so far.
+2. If you have asked LESS THAN 5 questions: Acknowledge the candidate's last answer briefly, then ask the NEXT relevant interview question.
+3. If you have asked BETWEEN 5 and 9 questions: You may ask another question if needed, OR conclude the interview.
+4. If you have asked 10 questions: You MUST conclude the interview.
+5. TO CONCLUDE THE INTERVIEW: Do not ask any more questions. Write a professional thank you note, clearly state that the interview is now over, and wish the candidate all the best in their career.
 
-Features to embrace:
-- Natural speaking style
-- Encouraging tone
-- Intelligent follow-up questions
-- Context-aware responses
-- Dynamic interview progression
-
-AVOID AT ALL COSTS:
-- Robotic replies
-- Short answers
-- Repetitive questions
-- Ending the interview quickly
-
-Focus on evaluating:
-- communication skills
-- technical understanding
-- confidence
-- problem-solving
-
-Behave exactly like a real senior interviewer in a top tech company.` 
+CRITICAL RULES:
+- Ask ONLY ONE question at a time. Do not overwhelm the candidate.
+- NEVER ask a question if you are concluding the interview.
+- Evaluate the candidate's previous response gracefully before asking the next question.
+- Behave exactly like a real senior interviewer in a top tech company. Natural, encouraging, and highly context-aware.` 
         : "Provide a short, insightful, and highly conversational point (1-2 sentences)."}
       
-      RULES: Plain text only. No emojis. Tone should be highly conversational, empathetic, and professional. End with a question if interviewing.
+      RULES: Plain text only. No emojis. Tone should be highly conversational, empathetic, and professional.
     `;
 
     let responseText = "";
