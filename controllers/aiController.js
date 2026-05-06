@@ -149,6 +149,11 @@ exports.generateMOM = async (req, res) => {
     
     const prompt = `
       You are an expert executive secretary. Based on the following meeting data (speech transcript and chat logs), generate professional Minutes of Meeting (MOM).
+      
+      CRITICAL INSTRUCTION:
+      The MOM should be generated using the spoken voice/transcript of the AI Bot and the human participants. 
+      If the AI Bot is not present in the session, generate the MOM solely on the basis of the human conversation (transcript) and text messages (chat logs).
+      
       Include: Executive Summary, Key Discussion Points, Decisions Made, and Action Items.
       
       DATA:
