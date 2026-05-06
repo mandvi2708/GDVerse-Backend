@@ -73,7 +73,7 @@ Behave exactly like a real senior interviewer in a top tech company.`
     `;
 
     let responseText = "";
-    const modelsToTry = ["gemini-pro", "gemini-1.5-flash"];
+    const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-pro"];
 
     for (const modelName of modelsToTry) {
       try {
@@ -144,7 +144,7 @@ exports.generateMOM = async (req, res) => {
       return res.status(500).json({ message: "AI Configuration missing. Cannot generate MOM." });
     }
 
-    const modelsToTry = ["gemini-1.5-flash", "gemini-pro"];
+    const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-pro"];
     let mom = "";
     
     const prompt = `
@@ -226,7 +226,7 @@ exports.getInterviewFeedback = async (req, res) => {
       return res.status(500).json({ message: "AI Configuration missing. Cannot generate Feedback." });
     }
 
-    const modelsToTry = ["gemini-1.5-flash", "gemini-pro"];
+    const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-pro"];
     let feedbackText = "";
     
     const prompt = `
