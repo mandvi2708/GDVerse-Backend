@@ -160,7 +160,15 @@ exports.generateMOM = async (req, res) => {
     for (const modelName of modelsToTry) {
       try {
         console.log(`📝 Trying ${modelName} for MOM...`);
-        const model = genAI.getGenerativeModel({ model: modelName });
+        const model = genAI.getGenerativeModel({ 
+          model: modelName,
+          safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+          ]
+        });
         const result = await model.generateContent(prompt);
         mom = result.response.text();
         if (mom) break;
@@ -241,7 +249,15 @@ exports.getInterviewFeedback = async (req, res) => {
     for (const modelName of modelsToTry) {
       try {
         console.log(`📊 Trying ${modelName} for Feedback...`);
-        const model = genAI.getGenerativeModel({ model: modelName });
+        const model = genAI.getGenerativeModel({ 
+          model: modelName,
+          safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+          ]
+        });
         const result = await model.generateContent(prompt);
         feedbackText = result.response.text();
         if (feedbackText) break;
