@@ -20,7 +20,7 @@ exports.createSession = async (req, res) => {
       return res.status(401).json({ message: 'Invalid or expired token. Please log in again.' });
     }
 
-    let { date, time, aiCount, humanCount, isImmediate, isInterviewMode, jobDescription } = req.body;
+    let { date, time, duration, title, description, aiCount, humanCount, isImmediate, isInterviewMode, jobDescription } = req.body;
 
     if (isImmediate) {
       const now = new Date();
@@ -42,6 +42,9 @@ exports.createSession = async (req, res) => {
       creator: decoded.id,
       date,
       time,
+      duration: duration || '30 mins',
+      title: title || 'New Discussion',
+      description: description || 'A collaborative session',
       aiCount: finalAiCount,
       humanCount: finalHumanCount,
       isInterviewMode: !!isInterviewMode,

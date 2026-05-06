@@ -10,6 +10,18 @@ const SessionSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  duration: {
+    type: String,
+    default: '30 mins'
+  },
+  title: {
+    type: String,
+    default: 'New Discussion'
+  },
+  description: {
+    type: String,
+    default: 'A collaborative session'
+  },
   aiCount: {
     type: Number,
     required: true
