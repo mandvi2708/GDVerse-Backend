@@ -70,7 +70,17 @@ exports.getUserSessions = async (req, res) => {
       .populate('creator', 'name')
       .sort({ createdAt: -1 });
 
-    res.status(200).json(sessions);
+    const io = req.app.get('io');
+    const sessionsWithRealTime = sessions.map(session => {
+      let realTimeHumans = 0;
+      if (io && session.inviteLink) {
+         const room = io.sockets.adapter.rooms.get(session.inviteLink.toLowerCase());
+         realTimeHumans = room ? room.size : 0;
+      }
+      return { ...session.toObject(), realTimeHumans };
+    });
+
+    res.status(200).json(sessionsWithRealTime);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -112,7 +122,17 @@ exports.getAllSessions = async (req, res) => {
       .populate('creator', 'name')
       .sort({ createdAt: -1 });
 
-    res.status(200).json(sessions);
+    const io = req.app.get('io');
+    const sessionsWithRealTime = sessions.map(session => {
+      let realTimeHumans = 0;
+      if (io && session.inviteLink) {
+         const room = io.sockets.adapter.rooms.get(session.inviteLink.toLowerCase());
+         realTimeHumans = room ? room.size : 0;
+      }
+      return { ...session.toObject(), realTimeHumans };
+    });
+
+    res.status(200).json(sessionsWithRealTime);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
