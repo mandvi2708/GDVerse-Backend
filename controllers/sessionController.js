@@ -22,12 +22,6 @@ exports.createSession = async (req, res) => {
 
     let { date, time, duration, title, description, aiCount, humanCount, isImmediate, isInterviewMode, jobDescription } = req.body;
 
-    if (isImmediate) {
-      const now = new Date();
-      date = now.toISOString().split('T')[0];
-      time = now.toTimeString().split(' ')[0].substring(0, 5);
-    }
-
     if (!date || !time) {
       return res.status(400).json({ message: 'Please select a valid date and time' });
     }
@@ -49,6 +43,7 @@ exports.createSession = async (req, res) => {
       humanCount: finalHumanCount,
       isInterviewMode: !!isInterviewMode,
       jobDescription: jobDescription || "",
+      isImmediate: !!isImmediate,
       inviteLink,
     });
 

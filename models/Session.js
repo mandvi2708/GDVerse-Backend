@@ -53,6 +53,10 @@ const SessionSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  isImmediate: {
+    type: Boolean,
+    default: false
+  },
   jobDescription: {
     type: String,
     default: ""
