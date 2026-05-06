@@ -82,6 +82,12 @@ io.on('connection', (socket) => {
     io.to(targetId).emit('ice-candidate', { candidate, from: socket.id });
   });
 
+  // Screen Share Relay
+  socket.on('screen-share-status', ({ roomId, isSharing }) => {
+    const normalizedRoomId = roomId?.trim().toLowerCase();
+    socket.to(normalizedRoomId).emit('screen-share-status', { userId: socket.id, isSharing });
+  });
+
   // Chat Relay
   socket.on('chat-message', async ({ roomId, content, senderName }) => {
     const normalizedRoomId = roomId?.trim().toLowerCase();
