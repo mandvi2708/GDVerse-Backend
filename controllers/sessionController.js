@@ -66,7 +66,9 @@ exports.getUserSessions = async (req, res) => {
     if (!token) return res.status(401).json({ message: 'Unauthorized' });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const sessions = await Session.find({ creator: decoded.id }).sort({ createdAt: -1 });
+    const sessions = await Session.find({ creator: decoded.id })
+      .populate('creator', 'name')
+      .sort({ createdAt: -1 });
 
     res.status(200).json(sessions);
   } catch (err) {
