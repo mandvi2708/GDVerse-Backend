@@ -89,10 +89,11 @@ exports.getBotResponse = async (req, res) => {
  */
 exports.generateMOM = async (req, res) => {
   const { sessionId } = req.body;
-  console.log(`📝 [MOM Request] inviteLink: ${sessionId}`);
+  const normalizedSessionId = sessionId?.trim().toLowerCase();
+  console.log(`📝 [MOM Request] inviteLink: ${normalizedSessionId}`);
 
   try {
-    const session = await Session.findOne({ inviteLink: sessionId });
+    const session = await Session.findOne({ inviteLink: normalizedSessionId });
     if (!session) return res.status(404).json({ message: "Session not found" });
 
     const transcriptText = (session.transcript || [])
@@ -106,7 +107,10 @@ exports.generateMOM = async (req, res) => {
     const combinedHistory = `TRANSCRIPT:\n${transcriptText}\n\nCHAT LOG:\n${chatText}`;
 
     if (!transcriptText && !chatText) {
-      return res.status(400).json({ message: "No data found to summarize" });
+      return res.status(200).json({ 
+        message: "No data", 
+        minutesOfMeeting: "No conversation data found to summarize. Please engage in the chat or speak first." 
+      });
     }
 
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
@@ -135,11 +139,12 @@ exports.generateMOM = async (req, res) => {
 
 exports.getInterviewFeedback = async (req, res) => {
   const { sessionId, userName } = req.body;
+  const normalizedSessionId = sessionId?.trim().toLowerCase();
   
-  console.log(`📊 [Feedback Request] Session: ${sessionId}, User: ${userName || 'All'}`);
+  console.log(`📊 [Feedback Request] Session: ${normalizedSessionId}, User: ${userName || 'All'}`);
 
   try {
-    const session = await Session.findOne({ inviteLink: sessionId });
+    const session = await Session.findOne({ inviteLink: normalizedSessionId });
     if (!session) return res.status(404).json({ message: "Session not found" });
 
     // Filter data for the specific user
@@ -156,7 +161,9 @@ exports.getInterviewFeedback = async (req, res) => {
     const combinedUserContent = `SPEECH:\n${userTranscript}\n\nCHAT:\n${userChat}`;
 
     if (!userTranscript && !userChat) {
-      return res.status(400).json({ message: "No data found for this user to evaluate" });
+      return res.status(200).json({ 
+        feedback: "No data found for this user to evaluate. Please participate in the session first." 
+      });
     }
 
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
@@ -183,7 +190,7 @@ exports.getInterviewFeedback = async (req, res) => {
     // Persist assessment if userName is provided
     if (userName) {
       await Session.findOneAndUpdate(
-        { inviteLink: sessionId },
+        { inviteLink: normalizedSessionId },
         { $push: { userAssessments: { userName, feedback: feedbackText } } }
       );
     }
