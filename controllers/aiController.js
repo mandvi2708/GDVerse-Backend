@@ -139,7 +139,14 @@ exports.generateMOM = async (req, res) => {
       });
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    if (!genAI) {
+      console.error(`[MOM Request] ❌ Configuration Error: genAI not initialized`);
+      return res.status(500).json({ message: "AI Configuration missing. Cannot generate MOM." });
+    }
+
+    const modelsToTry = ["gemini-1.5-flash", "gemini-pro"];
+    let mom = "";
+    
     const prompt = `
       You are an expert executive secretary. Based on the following meeting data (speech transcript and chat logs), generate professional Minutes of Meeting (MOM).
       Include: Executive Summary, Key Discussion Points, Decisions Made, and Action Items.
@@ -150,8 +157,22 @@ exports.generateMOM = async (req, res) => {
       Tone: Professional, concise, and structured. Use Markdown.
     `;
 
-    const result = await model.generateContent(prompt);
-    const mom = result.response.text();
+    for (const modelName of modelsToTry) {
+      try {
+        console.log(`📝 Trying ${modelName} for MOM...`);
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent(prompt);
+        mom = result.response.text();
+        if (mom) break;
+      } catch (err) {
+        console.error(`⚠️ ${modelName} MOM failed:`, err.message);
+      }
+    }
+
+    if (!mom) {
+      return res.status(500).json({ message: "Failed to generate MOM from all AI models." });
+    }
+
 
     session.minutesOfMeeting = mom;
     await session.save();
@@ -192,7 +213,14 @@ exports.getInterviewFeedback = async (req, res) => {
       });
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    if (!genAI) {
+      console.error(`[Feedback Request] ❌ Configuration Error: genAI not initialized`);
+      return res.status(500).json({ message: "AI Configuration missing. Cannot generate Feedback." });
+    }
+
+    const modelsToTry = ["gemini-1.5-flash", "gemini-pro"];
+    let feedbackText = "";
+    
     const prompt = `
       You are an expert HR and Technical Evaluator. Analyze the following contributions from a participant named "${userName || 'the candidate'}" in a ${session.isInterviewMode ? 'Technical Interview' : 'Group Discussion'}.
       
@@ -210,8 +238,22 @@ exports.getInterviewFeedback = async (req, res) => {
       Tone: Constructive and professional.
     `;
 
-    const result = await model.generateContent(prompt);
-    const feedbackText = result.response.text();
+    for (const modelName of modelsToTry) {
+      try {
+        console.log(`📊 Trying ${modelName} for Feedback...`);
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent(prompt);
+        feedbackText = result.response.text();
+        if (feedbackText) break;
+      } catch (err) {
+        console.error(`⚠️ ${modelName} Feedback failed:`, err.message);
+      }
+    }
+
+    if (!feedbackText) {
+      return res.status(500).json({ message: "Failed to generate Feedback from all AI models." });
+    }
+
 
     // Persist assessment if userName is provided
     if (userName) {
