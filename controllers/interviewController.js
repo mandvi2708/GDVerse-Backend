@@ -120,9 +120,16 @@ async function generateAIQuestion(interview) {
 
 exports.submitAnswer = async (req, res) => {
   try {
-    const { interviewId, answer } = req.body;
+    const { interviewId, answer, forceComplete } = req.body;
     const interview = await Interview.findById(interviewId);
     if (!interview) return res.status(404).json({ message: "Interview session not found." });
+
+    if (forceComplete) {
+      interview.status = 'completed'; // Mark as completed to remove from 'Ongoing'
+      await generateFinalReport(interview);
+      await interview.save();
+      return res.json({ message: "Session ended manually.", isCompleted: true });
+    }
 
     // Save candidate answer
     interview.conversation.push({
