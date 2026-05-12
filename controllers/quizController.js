@@ -164,6 +164,20 @@ exports.getMyQuizzes = async (req, res) => {
         const quizzes = await Quiz.find({ creator: req.user.id }).sort({ createdAt: -1 });
         res.json(quizzes);
     } catch (err) {
-        res.status(500).json({ message: "Failed to fetch assessments." });
+        console.error("GET MY QUIZZES ERROR:", err);
+        res.status(500).json({ message: "Failed to fetch assessments.", error: err.message });
+    }
+};
+
+exports.getQuiz = async (req, res) => {
+    try {
+        const quiz = await Quiz.findById(req.params.id);
+        if (!quiz || (quiz.creator && quiz.creator.toString() !== req.user.id)) {
+            return res.status(404).json({ message: "Assessment not found or unauthorized." });
+        }
+        res.json(quiz);
+    } catch (err) {
+        console.error("GET QUIZ ERROR:", err);
+        res.status(500).json({ message: "Error fetching assessment." });
     }
 };

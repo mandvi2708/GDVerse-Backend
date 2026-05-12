@@ -132,3 +132,21 @@ exports.getAllSessions = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+// ✅ 6. Update session settings (e.g. chat toggle)
+exports.updateSessionSettings = async (req, res) => {
+  try {
+    const { inviteLink } = req.params;
+    const { chatEnabled } = req.body;
+
+    const session = await Session.findOneAndUpdate(
+      { inviteLink },
+      { chatEnabled },
+      { new: true }
+    );
+
+    if (!session) return res.status(404).json({ message: 'Session not found' });
+    res.status(200).json(session);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};

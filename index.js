@@ -113,6 +113,11 @@ io.on('connection', (socket) => {
     } catch (e) { console.error('Chat save error:', e); }
   });
 
+  socket.on('chat-toggle', ({ roomId, enabled }) => {
+    const normalizedRoomId = roomId?.trim().toLowerCase();
+    socket.to(normalizedRoomId).emit('chat-toggle', { enabled });
+  });
+
   // Transcript Relay
   socket.on('transcript-update', async ({ roomId, sender, text }) => {
     try {

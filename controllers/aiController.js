@@ -134,18 +134,22 @@ exports.generateMOM = async (req, res) => {
     let mom = "";
     
     const prompt = `
-      You are an expert executive secretary. Based on the following meeting data, which includes text chats and transcriptions, generate professional Minutes of Meeting (MOM).
+      You are an elite executive assistant. Create a crisp, concise, and high-impact Minutes of Meeting (MOM) based on the following conversation transcript and chat messages.
       
-      CRITICAL INSTRUCTION:
-      Analyze ALL provided data, especially the CHAT LOG, to create the summary. Treat the CHAT LOG as direct communication shared during the meeting between participants.
-      Include every detail discussed by the participants.
-      
-      Include: Executive Summary, Key Discussion Points, Decisions Made, and Action Items.
-      
-      DATA:
-      ${combinedHistory}
+      CRITICAL GUIDELINES:
+      1. BREVITY IS KEY: Use sharp bullet points. Avoid long paragraphs.
+      2. EXECUTIVE SUMMARY: Maximum 2-3 sentences.
+      3. KEY DECISIONS: List only the final outcomes.
+      4. ACTION ITEMS: Clear "Who does What by When".
+      5. TONE: Professional, neutral, and direct.
 
-      Tone: Professional, concise, and structured. Use Markdown.
+      TITLE: ${session.title}
+      AGENDA: ${session.description}
+
+      TRANSCRIPT: ${transcriptText}
+      CHAT MESSAGES: ${chatText}
+
+      Format the output in clean Markdown. Use bolding for emphasis but keep the total length under 300 words unless absolutely necessary.
     `;
 
     for (const modelName of modelsToTry) {

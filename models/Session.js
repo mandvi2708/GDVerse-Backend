@@ -65,6 +65,10 @@ const SessionSchema = new mongoose.Schema({
     type: String,
     default: ""
   },
+  chatEnabled: {
+    type: Boolean,
+    default: true
+  },
   userAssessments: [
     {
       userName: String,

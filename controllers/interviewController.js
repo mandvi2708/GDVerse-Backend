@@ -253,15 +253,16 @@ exports.getMyInterviews = async (req, res) => {
         const interviews = await Interview.find({ creator: req.user.id }).sort({ createdAt: -1 });
         res.json(interviews);
     } catch (err) {
-        res.status(500).json({ message: "Failed to fetch interviews." });
+        console.error("GET MY INTERVIEWS ERROR:", err);
+        res.status(500).json({ message: "Failed to fetch interviews.", error: err.message });
     }
 };
 
 exports.getInterview = async (req, res) => {
     try {
         const interview = await Interview.findById(req.params.id);
-        if (!interview || interview.creator.toString() !== req.user.id) {
-            return res.status(404).json({ message: "Interview not found." });
+        if (!interview || (interview.creator && interview.creator.toString() !== req.user.id)) {
+            return res.status(404).json({ message: "Interview not found or unauthorized." });
         }
         res.json(interview);
     } catch (err) {
