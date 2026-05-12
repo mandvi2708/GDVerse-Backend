@@ -33,10 +33,14 @@ const Session = require('./models/Session');
 const authRoutes = require('./routes/authRoutes');
 const sessionRoutes = require('./routes/sessionRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const interviewRoutes = require('./routes/interviewRoutes');
+const quizRoutes = require('./routes/quizRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/interviews', interviewRoutes);
+app.use('/api/quizzes', quizRoutes);
 
 // --- New Standardized WebRTC Signaling System ---
 const users = {}; // { socketId: { roomId, userName } }
@@ -117,6 +121,17 @@ io.on('connection', (socket) => {
         { $push: { transcript: { sender, text, timestamp: new Date() } } }
       );
     } catch (e) { console.error('Transcript save error:', e); }
+  });
+
+  // --- AI Interview Events ---
+  socket.on('start_interview', ({ interviewId }) => {
+    socket.join(`interview_${interviewId}`);
+    console.log(`🎤 Interview session started: ${interviewId}`);
+  });
+
+  socket.on('candidate_answer', ({ interviewId, answer }) => {
+    // This can be used for real-time transcription/typing indicators
+    socket.to(`interview_${interviewId}`).emit('candidate_typing', { isTyping: true });
   });
 
   socket.on('disconnect', () => {
