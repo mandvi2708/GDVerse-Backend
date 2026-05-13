@@ -97,7 +97,8 @@ CRITICAL RULES:
 };
 
 /**
- * 🚀 ZERO-CRASH MOM Generation
+ * 🚀 Z/**
+ * 🚀 ZERO-CRASH MOM Generation - Optimized for Stability
  */
 exports.generateMOM = async (req, res) => {
   const { sessionId } = req.body;
@@ -109,14 +110,14 @@ exports.generateMOM = async (req, res) => {
     if (!session) return res.status(404).json({ message: "Session not found" });
 
     const transcriptText = (session.transcript || [])
-      .map(t => `[Speech] ${t.sender}: ${t.text}`)
+      .map(t => `[Speech] ${t.sender || 'Participant'}: ${t.text || ''}`)
+      .filter(t => t.trim())
       .join("\n");
 
     const chatText = (session.chatMessages || [])
-      .map(c => `[Chat] ${c.senderName}: ${c.content}`)
+      .map(c => `[Chat] ${c.senderName || 'Participant'}: ${c.content || ''}`)
+      .filter(c => c.trim())
       .join("\n");
-
-    const combinedHistory = `TRANSCRIPT:\n${transcriptText}\n\nCHAT LOG:\n${chatText}`;
 
     if (!transcriptText && !chatText) {
       return res.status(200).json({ 
@@ -127,66 +128,95 @@ exports.generateMOM = async (req, res) => {
 
     if (!genAI) {
       console.error(`[MOM Request] ❌ Configuration Error: genAI not initialized`);
-      return res.status(500).json({ message: "AI Configuration missing. Cannot generate MOM." });
+      return res.status(500).json({ message: "AI Configuration missing. Please check GEMINI_API_KEY." });
     }
 
-    const modelsToTry = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-pro", "gemini-pro-latest"];
+    // Use full model paths for maximum compatibility with the SDK
+    const modelsToTry = [
+      "models/gemini-1.5-flash",
+      "models/gemini-1.5-pro",
+      "models/gemini-2.0-flash",
+      "models/gemini-flash-latest"
+    ];
+    
     let mom = "";
+    let lastError = "";
     
     const prompt = `
       You are an elite executive assistant. Create a crisp, concise, and high-impact Minutes of Meeting (MOM) based on the following conversation transcript and chat messages.
       
       CRITICAL GUIDELINES:
-      1. BREVITY IS KEY: Use sharp bullet points. Avoid long paragraphs.
-      2. EXECUTIVE SUMMARY: Maximum 2-3 sentences.
-      3. KEY DECISIONS: List only the final outcomes.
-      4. ACTION ITEMS: Clear "Who does What by When".
-      5. TONE: Professional, neutral, and direct.
+      1. BREVITY: Use sharp bullet points.
+      2. SUMMARY: Max 2-3 sentences.
+      3. DECISIONS & ACTIONS: Focus on outcomes and "Who does What".
+      4. TONE: Professional and direct.
 
-      TITLE: ${session.title}
-      AGENDA: ${session.description}
+      TITLE: ${session.title || 'Meeting'}
+      AGENDA: ${session.description || 'General Discussion'}
 
-      TRANSCRIPT: ${transcriptText}
-      CHAT MESSAGES: ${chatText}
+      TRANSCRIPT: 
+      ${transcriptText}
 
-      Format the output in clean Markdown. Use bolding for emphasis but keep the total length under 300 words unless absolutely necessary.
+      CHAT MESSAGES: 
+      ${chatText}
+
+      Format: Clean Markdown. Keep it under 400 words.
     `;
 
     for (const modelName of modelsToTry) {
       try {
         console.log(`📝 Trying ${modelName} for MOM...`);
-        const model = genAI.getGenerativeModel({ 
-          model: modelName,
-          safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-          ]
-        });
+        const model = genAI.getGenerativeModel({ model: modelName });
         const result = await model.generateContent(prompt);
-        mom = result.response.text();
-        if (mom) break;
+        
+        if (result && result.response) {
+          mom = result.response.text();
+          if (mom && mom.trim()) {
+            console.log(`✅ MOM generated successfully with ${modelName}`);
+            break;
+          }
+        }
       } catch (err) {
+        lastError = err.message;
         console.error(`⚠️ ${modelName} MOM failed:`, err.message);
+        // Continue to next model
       }
     }
 
+    // Fallback: If AI fails, generate a basic structural MOM
     if (!mom) {
-      return res.status(500).json({ 
-        message: "Failed to generate MOM from all AI models. This is likely due to temporary API quota limits.",
-        error: "All models failed"
-      });
+      console.warn("⚠️ AI Generation failed. Using structural fallback.");
+      mom = `
+# Minutes of Meeting (Auto-Generated Summary)
+
+**Meeting:** ${session.title || 'Discussion'}
+**Status:** AI Summary Unavailable (Quota/Limit reached)
+
+### Summary of Activity
+- **Speech Contributions:** ${session.transcript?.length || 0} segments recorded.
+- **Chat Messages:** ${session.chatMessages?.length || 0} messages exchanged.
+
+### Participants
+${Array.from(new Set([
+  ...(session.transcript || []).map(t => t.sender),
+  ...(session.chatMessages || []).map(c => c.senderName)
+])).filter(Boolean).map(name => `- ${name}`).join('\n')}
+
+*Note: A detailed AI summary could not be generated at this time due to high traffic. Please try again later.*
+      `.trim();
     }
 
-
+    // Save the generated MOM (even if fallback)
     session.minutesOfMeeting = mom;
     await session.save();
 
-    res.json({ message: "MOM generated", minutesOfMeeting: mom });
+    return res.json({ message: "MOM generated", minutesOfMeeting: mom });
   } catch (error) {
-    console.error("🔥 [MOM Error]:", error.message);
-    res.status(500).json({ message: "MOM generation failed", error: error.message });
+    console.error("🔥 [MOM Global Error]:", error.stack);
+    return res.status(500).json({ 
+      message: "MOM generation failed internally", 
+      error: error.message 
+    });
   }
 };
 
