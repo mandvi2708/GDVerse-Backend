@@ -59,7 +59,7 @@ CRITICAL RULES:
     `;
 
     let responseText = "";
-    const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-pro"];
+    const modelsToTry = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-pro", "gemini-pro-latest"];
 
     for (const modelName of modelsToTry) {
       try {
@@ -130,7 +130,7 @@ exports.generateMOM = async (req, res) => {
       return res.status(500).json({ message: "AI Configuration missing. Cannot generate MOM." });
     }
 
-    const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-pro"];
+    const modelsToTry = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-pro", "gemini-pro-latest"];
     let mom = "";
     
     const prompt = `
@@ -173,7 +173,10 @@ exports.generateMOM = async (req, res) => {
     }
 
     if (!mom) {
-      return res.status(500).json({ message: "Failed to generate MOM from all AI models." });
+      return res.status(500).json({ 
+        message: "Failed to generate MOM from all AI models. This is likely due to temporary API quota limits.",
+        error: "All models failed"
+      });
     }
 
 
@@ -221,7 +224,7 @@ exports.getInterviewFeedback = async (req, res) => {
       return res.status(500).json({ message: "AI Configuration missing. Cannot generate Feedback." });
     }
 
-    const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-pro"];
+    const modelsToTry = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-pro", "gemini-pro-latest"];
     let feedbackText = "";
     
     const prompt = `
