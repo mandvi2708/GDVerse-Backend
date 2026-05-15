@@ -3,13 +3,19 @@ const Quiz = require("../models/Quiz");
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
 
-// 🛡️ API Key Sanitization
-let API_KEY = (process.env.GEMINI_API_KEY || "").trim();
-if (API_KEY.startsWith('YAIza')) API_KEY = API_KEY.substring(1);
-
-const genAI = new GoogleGenerativeAI(API_KEY);
+/**
+ * 🛡️ Helper to get a sanitized API KEY and genAI instance
+ */
+const getAIInstance = () => {
+  let API_KEY = (process.env.GEMINI_API_KEY || "").trim();
+  if (API_KEY.startsWith('YAIza')) API_KEY = API_KEY.substring(1);
+  console.log(`🔑 [Quiz Engine] Key Check: ${API_KEY ? API_KEY.substring(0, 6) + "..." : "NOT FOUND"}`);
+  return new GoogleGenerativeAI(API_KEY);
+};
 
 exports.generateQuiz = async (req, res) => {
+  const genAI = getAIInstance();
+
   try {
     const { topic, difficulty, fullName, email, jobRole, yearsExperience, jdText } = req.body;
     let resumeText = "";
@@ -123,8 +129,6 @@ exports.generateQuiz = async (req, res) => {
 
     await quiz.save();
     
-
-
     res.status(201).json(quiz);
 
   } catch (error) {
@@ -155,7 +159,8 @@ exports.submitQuiz = async (req, res) => {
         else if (accuracy >= 50) readinessLevel = "Intermediate";
 
         // AI Skill Gap Analysis
-        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+        const genAI = getAIInstance();
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const gapPrompt = `
           Based on the candidate's performance in a ${quiz.topic} quiz:
           Score: ${score}/${totalQuestions} (${accuracy}%)

@@ -3,16 +3,21 @@ const Interview = require("../models/Interview");
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
 
-// 🛡️ API Key Sanitization
-let API_KEY = (process.env.GEMINI_API_KEY || "").trim();
-if (API_KEY.startsWith('YAIza')) API_KEY = API_KEY.substring(1);
-
-const genAI = new GoogleGenerativeAI(API_KEY);
+/**
+ * 🛡️ Helper to get a sanitized API KEY and genAI instance
+ */
+const getAIInstance = () => {
+  let API_KEY = (process.env.GEMINI_API_KEY || "").trim();
+  if (API_KEY.startsWith('YAIza')) API_KEY = API_KEY.substring(1);
+  console.log(`🔑 [AI Engine] Key Check: ${API_KEY ? API_KEY.substring(0, 6) + "..." : "NOT FOUND"}`);
+  return new GoogleGenerativeAI(API_KEY);
+};
 
 /**
  * 🚀 Robust AI Call Helper with Fallback Models
  */
 async function callGeminiAI(prompt) {
+  const genAI = getAIInstance();
   const modelsToTry = [
     "gemini-1.5-flash", 
     "gemini-2.0-flash", 
@@ -24,7 +29,7 @@ async function callGeminiAI(prompt) {
   let lastError = "";
   for (const modelName of modelsToTry) {
     try {
-      console.log(`🚀 Interview Engine: Trying ${modelName}...`);
+      console.log(`🚀 AI Engine: Trying ${modelName}...`);
       const model = genAI.getGenerativeModel({ 
         model: modelName,
         safetySettings: [
@@ -39,13 +44,11 @@ async function callGeminiAI(prompt) {
       if (text) return text.trim();
     } catch (err) {
       lastError = err.message;
-      console.error(`⚠️ Interview Engine: ${modelName} failed:`, err.message);
+      console.error(`⚠️ AI Engine: ${modelName} failed:`, err.message);
     }
   }
   throw new Error(lastError || "All AI models failed to respond.");
 }
-
-const INTERVIEW_STAGES = ['Introduction', 'Technical', 'Behavioral', 'Conclusion'];
 
 exports.startInterview = async (req, res) => {
   try {
@@ -161,24 +164,21 @@ exports.submitAnswer = async (req, res) => {
     if (!interview) return res.status(404).json({ message: "Interview session not found." });
 
     if (forceComplete) {
-      interview.status = 'completed'; // Mark as completed to remove from 'Ongoing'
+      interview.status = 'completed';
       await generateFinalReport(interview);
       await interview.save();
       return res.json({ message: "Session ended manually.", isCompleted: true });
     }
 
-    // Save candidate answer
     interview.conversation.push({
       role: 'candidate',
       content: answer,
       stage: interview.stage
     });
 
-    // Evaluate in background
     const evaluation = await evaluateResponse(interview, answer);
     interview.conversation[interview.conversation.length - 1].evaluation = evaluation;
 
-    // Advance stage logic
     const totalQuestions = interview.conversation.filter(c => c.role === 'ai').length;
     if (totalQuestions < 2) interview.stage = 'Introduction';
     else if (totalQuestions < 8) interview.stage = 'Technical';
@@ -308,4 +308,3 @@ exports.getInterview = async (req, res) => {
         res.status(500).json({ message: "Error fetching interview." });
     }
 };
-
