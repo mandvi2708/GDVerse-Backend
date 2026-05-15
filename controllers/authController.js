@@ -115,3 +115,40 @@ exports.resetPassword = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+const { OAuth2Client } = require('google-auth-library');
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+exports.googleLogin = async (req, res) => {
+  const { tokenId } = req.body;
+
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken: tokenId,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const { name, email, picture, sub } = ticket.getPayload();
+
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // Create user if they don't exist
+      // Since it's Google login, we can generate a random password or leave it empty if the model allows
+      // But usually, it's better to have a random long password for safety if the field is required.
+      const randomPassword = crypto.randomBytes(16).toString('hex');
+      const hashed = await bcrypt.hash(randomPassword, 10);
+      user = await User.create({ name, email, password: hashed });
+    }
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    res.status(200).json({ token, user: userResponse });
+  } catch (err) {
+    console.error('Google Auth Error:', err);
+    res.status(400).json({ message: 'Google authentication failed' });
+  }
+};
+
