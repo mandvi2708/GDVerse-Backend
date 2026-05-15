@@ -3,7 +3,11 @@ const Quiz = require("../models/Quiz");
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// 🛡️ API Key Sanitization
+let API_KEY = (process.env.GEMINI_API_KEY || "").trim();
+if (API_KEY.startsWith('YAIza')) API_KEY = API_KEY.substring(1);
+
+const genAI = new GoogleGenerativeAI(API_KEY);
 
 exports.generateQuiz = async (req, res) => {
   try {
@@ -59,17 +63,53 @@ exports.generateQuiz = async (req, res) => {
     `;
 
     let questions;
-    try {
-      const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      const jsonMatch = text.match(/\[.*\]/s);
-      questions = JSON.parse(jsonMatch[0]);
-    } catch (aiError) {
-      console.error("Quiz AI Generation Failed:", aiError.message);
+    const modelsToTry = [
+      "gemini-1.5-flash", 
+      "gemini-2.0-flash", 
+      "gemini-flash-latest", 
+      "gemini-pro", 
+      "models/gemini-1.5-flash"
+    ];
+
+    let lastError = "";
+    for (const modelName of modelsToTry) {
+      try {
+        console.log(`🚀 Quiz Forge: Trying ${modelName}...`);
+        const model = genAI.getGenerativeModel({ 
+          model: modelName,
+          safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+          ]
+        });
+
+        const result = await model.generateContent(prompt);
+        
+        if (!result.response) {
+          throw new Error("No response from Gemini");
+        }
+
+        const text = result.response.text();
+        const jsonMatch = text.match(/\[.*\]/s);
+        if (jsonMatch) {
+          questions = JSON.parse(jsonMatch[0]);
+          console.log(`✅ Quiz Forge: Success using ${modelName}`);
+          break; 
+        }
+      } catch (aiError) {
+        lastError = aiError.message;
+        console.error(`⚠️ Quiz Forge: ${modelName} failed:`, aiError.message);
+      }
+    }
+
+    if (!questions) {
+      console.error("❌ Quiz Forge: ALL MODELS FAILED. Last Error:", lastError);
       return res.status(503).json({ 
-        message: "AI Assessment Forge failed. Please verify your GEMINI_API_KEY.",
-        error: aiError.message 
+        message: "AI Assessment Forge failed. This usually happens if your API Key is invalid or your Quota is reached.",
+        error: lastError,
+        tip: "Check your Render Logs for the specific Google error message."
       });
     }
 

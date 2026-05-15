@@ -3,7 +3,47 @@ const Interview = require("../models/Interview");
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// 🛡️ API Key Sanitization
+let API_KEY = (process.env.GEMINI_API_KEY || "").trim();
+if (API_KEY.startsWith('YAIza')) API_KEY = API_KEY.substring(1);
+
+const genAI = new GoogleGenerativeAI(API_KEY);
+
+/**
+ * 🚀 Robust AI Call Helper with Fallback Models
+ */
+async function callGeminiAI(prompt) {
+  const modelsToTry = [
+    "gemini-1.5-flash", 
+    "gemini-2.0-flash", 
+    "gemini-flash-latest", 
+    "gemini-pro", 
+    "models/gemini-1.5-flash"
+  ];
+
+  let lastError = "";
+  for (const modelName of modelsToTry) {
+    try {
+      console.log(`🚀 Interview Engine: Trying ${modelName}...`);
+      const model = genAI.getGenerativeModel({ 
+        model: modelName,
+        safetySettings: [
+          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+        ]
+      });
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      if (text) return text.trim();
+    } catch (err) {
+      lastError = err.message;
+      console.error(`⚠️ Interview Engine: ${modelName} failed:`, err.message);
+    }
+  }
+  throw new Error(lastError || "All AI models failed to respond.");
+}
 
 const INTERVIEW_STAGES = ['Introduction', 'Technical', 'Behavioral', 'Conclusion'];
 
@@ -54,7 +94,7 @@ exports.startInterview = async (req, res) => {
     } catch (aiError) {
       console.error("AI Generation Failed:", aiError.message);
       return res.status(503).json({ 
-        message: "AI Service Unavailable. Please check your GEMINI_API_KEY in the backend .env file.",
+        message: "AI Service Unavailable. Please verify your GEMINI_API_KEY in the production environment.",
         error: aiError.message 
       });
     }
@@ -65,8 +105,6 @@ exports.startInterview = async (req, res) => {
       stage: 'Introduction'
     });
     await interview.save();
-
-
 
     res.status(201).json({ 
       message: "Interview session initialized.", 
@@ -113,9 +151,7 @@ async function generateAIQuestion(interview) {
     Respond only with the interviewer's next statement. Keep it short.
   `;
 
-  const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
-  const result = await model.generateContent(systemInstruction);
-  return result.response.text().trim();
+  return await callGeminiAI(systemInstruction);
 }
 
 exports.submitAnswer = async (req, res) => {
@@ -196,10 +232,9 @@ async function evaluateResponse(interview, answer) {
     }
   `;
 
-  const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
-  const result = await model.generateContent(prompt);
+  const result = await callGeminiAI(prompt);
   try {
-    const jsonMatch = result.response.text().match(/\{.*\}/s);
+    const jsonMatch = result.match(/\{.*\}/s);
     return JSON.parse(jsonMatch[0]);
   } catch (e) {
     return { score: 7, feedback: "Response processed successfully." };
@@ -233,13 +268,10 @@ async function generateFinalReport(interview) {
     }
   `;
 
-  const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
-  const result = await model.generateContent(prompt);
+  const result = await callGeminiAI(prompt);
   try {
-    const jsonMatch = result.response.text().match(/\{.*\}/s);
+    const jsonMatch = result.match(/\{.*\}/s);
     interview.finalReport = JSON.parse(jsonMatch[0]);
-    
-
   } catch (e) {
     console.error("Report generation failed.");
   }
