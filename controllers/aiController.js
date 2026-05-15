@@ -10,6 +10,22 @@ console.log(`🔑 [AI Config] Key Masked: ${API_KEY ? API_KEY.substring(0, 8) + 
 const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
 /**
+ * 🔍 Diagnostic Route to verify API Key on Render
+ */
+exports.debugAI = async (req, res) => {
+  const API_KEY = (process.env.GEMINI_API_KEY || "").trim();
+  const maskedKey = API_KEY ? `${API_KEY.substring(0, 6)}...${API_KEY.substring(API_KEY.length - 4)}` : "NOT FOUND";
+  
+  res.json({
+    status: API_KEY ? "Key Present" : "Key Missing",
+    maskedKey: maskedKey,
+    nodeVersion: process.version,
+    envStatus: process.env.NODE_ENV || "not set",
+    tip: "If maskedKey says 'NOT FOUND', you must add GEMINI_API_KEY to your Render Environment Variables dashboard."
+  });
+};
+
+/**
  * 🚀 ZERO-CRASH AI Bot Response Controller
  */
 exports.getBotResponse = async (req, res) => {
